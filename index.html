@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработчик книгообеспеченности</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Шапка приложения -->
+        <header class="app-header">
+            <div class="header-top">
+                <h1>📊 Обработчик книгообеспеченности дисциплин</h1>
+                <div class="header-badge">
+                    <span class="badge-version">v2.0</span>
+                </div>
+            </div>
+            <p class="header-description">
+                Загрузите HTML-файл с таблицами книгообеспеченности. Приложение сохранит всю шапку документа, 
+                объединит данные по группам и пересчитает коэффициенты КО.
+            </p>
+        </header>
+
+        <!-- Основной контент -->
+        <div class="main-layout">
+            <!-- Левая панель - управление -->
+            <aside class="control-panel">
+                <!-- Блок загрузки -->
+                <div class="panel-section">
+                    <h2 class="panel-title">
+                        <span class="title-icon">📁</span>
+                        Загрузка документа
+                    </h2>
+                    
+                    <div class="upload-area" id="dropZone">
+                        <div class="upload-icon">📄</div>
+                        <div class="upload-text">
+                            <p class="upload-main">Перетащите файл сюда</p>
+                            <p class="upload-or">или</p>
+                            <button class="btn btn-primary" id="selectFileBtn">Выберите файл</button>
+                        </div>
+                        <input type="file" id="fileInput" accept=".html,.htm" style="display: none;">
+                        
+                        <div class="file-info" id="fileInfo">
+                            <span class="file-name">Файл не выбран</span>
+                        </div>
+                    </div>
+                    
+                    <div class="file-requirements">
+                        <p><strong>Требования к файлу:</strong></p>
+                        <ul>
+                            <li>Формат: HTML</li>
+                            <li>Таблицы с группами (ИП-21, ПО-31 и т.д.)</li>
+                            <li>Наличие колонок: студенты, литература, КО</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Блок информации о документе -->
+                <div class="panel-section" id="docInfoPanel" style="display: none;">
+                    <h2 class="panel-title">
+                        <span class="title-icon">📋</span>
+                        Информация о документе
+                    </h2>
+                    
+                    <div class="doc-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Таблиц найдено:</span>
+                            <span class="stat-value" id="tablesCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Обработано:</span>
+                            <span class="stat-value" id="processedCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Блок действий -->
+                <div class="panel-section actions-panel">
+                    <h2 class="panel-title">
+                        <span class="title-icon">⚡</span>
+                        Действия
+                    </h2>
+                    
+                    <div class="actions-grid">
+                      <button class="action-btn" id="processAllBtn" disabled>
+                          <span class="action-icon">🔄</span>
+                          <span class="action-text">Обработать все</span>
+                      </button>
+                      
+                      <button class="action-btn" id="previewHtmlBtn" disabled>
+                          <span class="action-icon">👁️</span>
+                          <span class="action-text">Предпросмотр</span>
+                      </button>
+                      
+                      <button class="action-btn success" id="downloadDocxBtn" disabled>
+                          <span class="action-icon">📥</span>
+                          <span class="action-text">DOCX</span>
+                      </button>
+                  </div>
+                </div>
+
+                <!-- Блок подсказок -->
+                <div class="panel-section hints-panel">
+                    <h2 class="panel-title">
+                        <span class="title-icon">💡</span>
+                        Как это работает
+                    </h2>
+                    
+                    <div class="hints-list">
+                        <div class="hint-item">
+                            <span class="hint-marker">1</span>
+                            <span class="hint-text">Загрузите HTML-файл с таблицами</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-marker">2</span>
+                            <span class="hint-text">Выберите таблицы для обработки</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-marker">3</span>
+                            <span class="hint-text">Нажмите "Обработать" для каждой таблицы</span>
+                        </div>
+                        <div class="hint-item">
+                            <span class="hint-marker">4</span>
+                            <span class="hint-text">Скачайте готовый документ</span>
+                        </div>
+                    </div>
+                    
+                    <div class="formula-box">
+                        <p class="formula-title">Формула расчета КО:</p>
+                        <p class="formula">КО = Экз.учеб. / (Всего_студ. × 0.2)</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Правая панель - список таблиц -->
+            <main class="tables-panel">
+                <div class="tables-header">
+                    <h2 class="tables-title">
+                        <span class="title-icon">📊</span>
+                        Найденные таблицы
+                    </h2>
+                    
+                    <div class="tables-controls">
+                        <button class="control-btn" id="expandAllBtn" disabled>
+                            <span class="btn-icon">▼</span>
+                            Развернуть все
+                        </button>
+                        <button class="control-btn" id="collapseAllBtn" disabled>
+                            <span class="btn-icon">▲</span>
+                            Свернуть все
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Контейнер для списка таблиц -->
+                <div class="tables-container" id="tablesList">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <h3 class="empty-title">Таблицы не найдены</h3>
+                        <p class="empty-text">Загрузите HTML-файл с таблицами книгообеспеченности</p>
+                        <p class="empty-hint">Поддерживаются файлы с расширением .html и .htm</p>
+                    </div>
+                </div>
+
+                <!-- Подвал с кнопками для всех таблиц -->
+                <div class="tables-footer" id="tablesFooter" style="display: none;">
+                    <button class="btn btn-primary" id="processVisibleBtn">
+                        ⚡ Обработать видимые
+                    </button>
+                    <span class="footer-hint">или обработайте каждую таблицу отдельно</span>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Модальное окно предпросмотра HTML -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span class="modal-icon">👁️</span>
+                    Предпросмотр HTML
+                </h3>
+                <!-- <button class="modal-close" id="closePreviewBtn">&times;</button> -->
+            </div>
+            
+            <div class="modal-body">
+                <div class="preview-tabs">
+                    <button class="preview-tab active" data-tab="code">Код HTML</button>
+                    <button class="preview-tab" data-tab="preview">Предпросмотр</button>
+                </div>
+                
+                <div class="preview-content active" id="previewCode">
+                    <textarea id="previewHtml" class="code-editor" readonly></textarea>
+                </div>
+                
+                <div class="preview-content" id="previewRender">
+                    <iframe id="previewIframe" class="preview-iframe"></iframe>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="footer-left">
+                    <span class="file-size" id="previewSize"></span>
+                </div>
+                <div class="footer-right">
+                    <button class="btn btn-secondary" id="copyHtmlBtn">
+                        📋 Копировать
+                    </button>
+                    <button class="btn btn-secondary" id="printHtmlBtn"> 
+                        🖨️ Печать
+                    </button>
+                    <button class="btn btn-success" id="downloadHtmlBtn">
+                        💾 Скачать HTML
+                    </button>
+                    <button class="btn btn-primary" id="closeModalBtn">
+                        Закрыть
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно информации об обработке -->
+    <div class="modal" id="infoModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span class="modal-icon">ℹ️</span>
+                    Результат обработки
+                </h3>
+                <button class="modal-close" id="closeInfoBtn">&times;</button>
+            </div>
+            
+            <div class="modal-body" id="infoModalBody">
+                <!-- Данные будут вставлены динамически -->
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="closeInfoModalBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/docshift@latest/dist/docshift.min.js"></script>
+    <script src="logic.js"></script>
+</body>
+</html>
