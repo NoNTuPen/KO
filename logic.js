@@ -32,6 +32,7 @@ class DocTableProcessor {
         this.copyHtmlBtn = document.getElementById('copyHtmlBtn');
         this.downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
         this.printHtmlBtn = document.getElementById('printHtmlBtn');
+        this.printCardsBtn = document.getElementById('printCardsBtn');
         this.closeModalBtn = document.getElementById('closeModalBtn');
         this.closePreviewBtn = document.getElementById('closePreviewBtn');
         
@@ -75,6 +76,10 @@ class DocTableProcessor {
             this.printHtmlBtn.addEventListener('click', () => this.printHtml());
         }
         
+        if (this.printCardsBtn) {
+            this.printCardsBtn.addEventListener('click', () => this.printCards());
+        }
+
         // Кнопки закрытия модального окна
         if (this.closeModalBtn) {
             this.closeModalBtn.addEventListener('click', () => this.closeAllModals());
@@ -665,6 +670,7 @@ showHtmlPreview() {
         // Ищем все таблицы с данными
         const tables = doc.querySelectorAll('table');
         this.tables = [];
+        let lastDepartment = null;
         
         tables.forEach((table, index) => {
             // Проверяем, есть ли в таблице строки с данными
@@ -696,6 +702,13 @@ showHtmlPreview() {
             if (hasDataRows) {
                 // Извлекаем название дисциплины из таблицы
                 const disciplineName = this.extractDisciplineName(table);
+                let department = this.extractDepartmentName(table);
+            if (department && department !== 'Кафедра не указана') {
+                lastDepartment = department; // обновляем глобальную
+            } else {
+                // если не нашли, используем предыдущую
+                department = lastDepartment || 'Кафедра не указана';
+            }
                 
                 this.tables.push({
                     id: `table-${index}`,
@@ -703,7 +716,8 @@ showHtmlPreview() {
                     originalHtml: table.outerHTML,
                     expanded: true,
                     processed: false,
-                    discipline: disciplineName || `Таблица ${index + 1}`
+                    discipline: disciplineName || `Таблица ${index + 1}`,
+                    department: department 
                 });
             }
         });
@@ -720,6 +734,259 @@ showHtmlPreview() {
         this.updateButtons();
     }
     
+
+    /**
+ * Извлекает все строки данных из оригинальной таблицы.
+ * Возвращает массив объектов с полями:
+ *   students, mainLit, addLit, methodLit, eumk, ko
+ */
+extractDataRowsFromTable(tableElement) {
+    const rows = tableElement.querySelectorAll('tr');
+    const dataRows = [];
+
+    for (let row of rows) {
+        const cells = row.querySelectorAll('td');
+        if (cells.length < 8) continue;
+
+        // Проверяем, является ли строка строкой данных (наличие курса и студентов)
+        const secondCell = cells[1]?.textContent.trim();
+        const thirdCell = cells[2]?.textContent.trim();
+        const hasCourse = secondCell && /^\d+$/.test(secondCell);
+        const hasStudents = thirdCell && /^\d+\/\d+$/.test(thirdCell);
+        if (!(hasCourse && hasStudents)) continue;
+
+        // Извлекаем значения (индексы могут отличаться, но обычно так)
+        const students = cells[2]?.textContent.trim() || '0/0';
+        const mainLit = cells[3]?.textContent.trim() || '0/0';
+        const addLit = cells[4]?.textContent.trim() || '0/0';
+        const methodLit = cells[5]?.textContent.trim() || '0/0';
+        const eumk = cells[6]?.textContent.trim() || '0/0';
+        let ko = cells[7]?.textContent.trim() || '';
+
+        // Если КО отсутствует – рассчитываем (по аналогии с processTable)
+        if (!ko) {
+            const [before, after] = students.split('/').map(Number);
+            const studentsForKo = before > 0 ? before : after;
+            const mainParts = mainLit.split('/');
+            let mainCount = 0;
+            if (mainParts.length >= 2) {
+                mainCount = parseInt(mainParts[1].replace(/,/g, '')) || 0;
+            }
+            ko = studentsForKo > 0 ? (mainCount / (studentsForKo * 0.2)).toFixed(2) : '0.00';
+        }
+
+        dataRows.push({ students, mainLit, addLit, methodLit, eumk, ko });
+    }
+
+    return dataRows;
+}
+
+printCards() {
+    if (this.tables.length === 0) {
+        alert('Сначала загрузите файл с таблицами');
+        return;
+    }
+
+    const unprocessed = this.tables.filter(t => !t.processed);
+    if (unprocessed.length > 0) {
+        if (confirm('Есть необработанные таблицы. Обработать их сейчас?')) {
+            this.processAllTables();
+        } else {
+            return;
+        }
+    }
+
+    const processedTables = this.tables.filter(t => t.processed);
+    if (processedTables.length === 0) {
+        alert('Нет обработанных таблиц для печати карточек');
+        return;
+    }
+
+    let cardsHtml = '';
+
+    processedTables.forEach(table => {
+        const tableEl = table.element;
+        if (!tableEl) return;
+
+        const rows = tableEl.querySelectorAll('tr');
+        let dataRows = [];
+
+        for (let row of rows) {
+            const cells = row.querySelectorAll('td');
+            // Строка данных содержит 8 ячеек и не является строкой заголовка
+            if (cells.length === 8 && !row.textContent.includes('Группа')) {
+                dataRows.push(row);
+            }
+        }
+
+        if (dataRows.length === 0) {
+            console.warn('Не найдены строки данных в таблице', table.discipline);
+            return;
+        }
+
+        let tableRowsHtml = '';
+        dataRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            const group = cells[0]?.textContent.trim() || '';
+            const course = cells[1]?.textContent.trim() || '';
+            const students = cells[2]?.textContent.trim() || '';
+            const mainLit = cells[3]?.textContent.trim() || '';
+            const addLit = cells[4]?.textContent.trim() || '';
+            const methodLit = cells[5]?.textContent.trim() || '';
+            const eumk = cells[6]?.textContent.trim() || '';
+            const ko = cells[7]?.textContent.trim() || '';
+
+            tableRowsHtml += `
+                <tr>
+                    <td>${group}</td>
+                    <td>${course}</td>
+                    <td>${students}</td>
+                    <td>${mainLit}</td>
+                    <td>${addLit}</td>
+                    <td>${methodLit}</td>
+                    <td>${eumk}</td>
+                    <td>${ko}</td>
+                </tr>
+            `;
+        });
+
+        cardsHtml += `
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-field">Год 2025/2026</div>
+                    <div class="card-field">Кафедра "${table.department}"</div>
+                    <div class="card-field discipline">Дисциплина "${table.discipline}"</div>
+                    <table class="card-table">
+                        <thead>
+                            <tr>
+                                <th>Группа</th>
+                                <th>Курс</th>
+                                <th>К-во ст.(до/зо)</th>
+                                <th>ОЛ</th>
+                                <th>ДЛ</th>
+                                <th>МУ</th>
+                                <th>ЭУМК</th>
+                                <th>КО</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    });
+
+    if (!cardsHtml) {
+        alert('Не удалось сформировать карточки');
+        return;
+    }
+
+    const printDoc = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Карточки книгообеспеченности</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+        .card {
+            width: 125mm;
+            height: 75mm;
+            box-sizing: border-box;
+            margin: 2mm auto;
+            border: 1px solid #000;
+            page-break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 10pt;
+            line-height: 1.2;
+            padding: 3mm;
+        }
+        .card-content {
+            width: 100%;
+            max-width: 115mm;
+        }
+        .card-field {
+            text-align: left;
+            margin-bottom: 2mm;
+            font-weight: normal;
+        }
+        .discipline {
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        .card-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2mm;
+            font-size: 8pt;
+        }
+        .card-table th, .card-table td {
+            border: 1px solid #000;
+            padding: 1px 2px;
+            text-align: center;
+            word-break: break-word;
+        }
+        .card-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        @media print {
+            body { margin: 0; padding: 0; }
+            .card { margin: 0 auto; border: 1px solid #000; }
+        }
+    </style>
+</head>
+<body>
+    ${cardsHtml}
+</body>
+</html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printDoc);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.print();
+    }, 500);
+}
+
+extractDepartmentName(tableElement) {
+    const rows = tableElement.querySelectorAll('tr');
+    for (let row of rows) {
+        const cells = row.querySelectorAll('td, th');
+        for (let cell of cells) {
+            const text = cell.textContent || '';
+            // Ищем "Кафедра:" и захватываем всё после двоеточия до конца строки
+            const match = text.match(/Кафедра[:\s]*([^\n\r]+)/i);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+        }
+        // Также проверяем текст всей строки на случай, если кафедра без ячейки (например, объединение)
+        const rowText = row.textContent || '';
+        const rowMatch = rowText.match(/Кафедра[:\s]*([^\n\r]+)/i);
+        if (rowMatch && rowMatch[1]) {
+            return rowMatch[1].trim();
+        }
+    }
+    return null; // вернём null, чтобы понять, что не нашли
+}
+
     /**
      * Извлекает название дисциплины из таблицы (УЛУЧШЕННАЯ ВЕРСИЯ)
      */
