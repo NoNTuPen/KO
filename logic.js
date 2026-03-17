@@ -1124,7 +1124,7 @@ extractDepartmentName(tableElement) {
         this.processedCount.textContent = processedCount;
     }
     
-    renderTablePreview(tableElement) {
+   renderTablePreview(tableElement) {
         // Создаем копию для предпросмотра
         const clone = tableElement.cloneNode(true);
         
