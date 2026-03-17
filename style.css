@@ -1016,3 +1016,15 @@ table th,
     border-bottom: none !important;
     margin: 0 10px;
 }
+
+.card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.card-content {
+    width: 100%;
+    max-width: 115mm; /* немного меньше карточки для отступов */
+    margin: 0 auto;
+}
