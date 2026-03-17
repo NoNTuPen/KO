@@ -645,7 +645,7 @@ showHtmlPreview() {
         };
         reader.readAsText(file);
     }
-    
+      
     /**
      * Очищает HTML от служебных конструкций
      */
